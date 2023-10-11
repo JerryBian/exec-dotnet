@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,21 +10,41 @@ namespace ExecDotnet
 {
     public static class Exec
     {
-        public static async Task RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
+        public static async Task<string> RunAsync(string command, CancellationToken cancellationToken = default)
         {
-            var linkedCancellationTokens = new List<CancellationToken> { cancellationToken};
-            if(option.Timeout > TimeSpan.Zero)
+            return await RunAsync(command, new ExecOption(), cancellationToken);
+        }
+
+        public static async Task<string> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
+        {
+            ExecOption.Validate(option);
+            var linkedCancellationTokens = new List<CancellationToken> { cancellationToken };
+            if (option.Timeout > TimeSpan.Zero)
             {
                 var customCancellationTokenSource = new CancellationTokenSource(option.Timeout);
                 linkedCancellationTokens.Add(customCancellationTokenSource.Token);
             }
 
+            var sb = new StringBuilder();
+            var tempScriptFile = await CreateScriptFileAsync(command, option, cancellationToken);
             var cts = CancellationTokenSource.CreateLinkedTokenSource(linkedCancellationTokens.ToArray());
             using var process = new Process();
             try
             {
-                process.StartInfo = await GetProcessStartInfoAsync(command, option, cts.Token);
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = option.Shell,
+                    Arguments = $"{option.ShellParameter} \"{tempScriptFile}\"",
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false
+                };
+                process.StartInfo = startInfo;
                 var outputTcs = new TaskCompletionSource<object>();
+                var errorTcs = new TaskCompletionSource<object>();
+
                 process.OutputDataReceived += async (sender, e) =>
                 {
                     if (e.Data == null)
@@ -32,11 +53,17 @@ namespace ExecDotnet
                     }
                     else
                     {
-                        await option.OutputDataReceived(e.Data);
+                        if (option.IsStreamed)
+                        {
+                            await option.OutputDataReceived(e.Data);
+                        }
+                        else
+                        {
+                            sb.AppendLine(e.Data);
+                        }
                     }
                 };
 
-                var errorTcs = new TaskCompletionSource<object>();
                 process.ErrorDataReceived += async (sender, e) =>
                 {
                     if (e.Data == null)
@@ -45,7 +72,14 @@ namespace ExecDotnet
                     }
                     else
                     {
-                        await option.ErrorDataReceived(e.Data);
+                        if (option.IsStreamed)
+                        {
+                            await option.ErrorDataReceived(e.Data);
+                        }
+                        else
+                        {
+                            sb.AppendLine(e.Data);
+                        }
                     }
                 };
 
@@ -65,32 +99,21 @@ namespace ExecDotnet
                 try
                 {
                     process.Kill(true);
+                    if (File.Exists(tempScriptFile))
+                    {
+                        File.Delete(tempScriptFile);
+                    }
                 }
                 catch { }
             }
-        }
-        private static async Task<ProcessStartInfo> GetProcessStartInfoAsync(
-            string command, 
-            ExecOption option, 
-            CancellationToken cancellationToken)
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = option.Shell,
-                Arguments = $"{option.ShellParameter} {await CreateScriptFileAsync(command, option, cancellationToken)}",
-                CreateNoWindow = true,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false
-            };
 
-            return startInfo;
+            return sb.ToString();
         }
 
         private static async Task<string> CreateScriptFileAsync(string command, ExecOption option, CancellationToken cancellationToken)
         {
-            var file = Path.Combine($"{option.TempFileLocation}{option.ShellExtension}", Path.GetTempFileName());
-            await File.WriteAllTextAsync(file, command, cancellationToken);
+            var file = Path.Combine(option.TempFileLocation, $"{Path.GetTempFileName()}{option.ShellExtension}");
+            await File.WriteAllTextAsync(file, command, new UTF8Encoding(false), cancellationToken);
             return file;
         }
     }
