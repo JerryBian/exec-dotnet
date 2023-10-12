@@ -17,6 +17,12 @@
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>True</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
+    <Authors>Jerry Bian</Authors>
+    <Product>Exec</Product>
+    <Description>A dotnet library to fire subprocess command call.</Description>
+    <Copyright>Copyright © Jerry Bian 2023</Copyright>
+    <Summary>A dotnet library to fire subprocess command call.</Summary>
+    <Title>Exec</Title>
   </PropertyGroup>
 
   <ItemGroup>
