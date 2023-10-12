@@ -19,9 +19,9 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Authors>Jerry Bian</Authors>
     <Product>Exec</Product>
-    <Description>A dotnet library to fire subprocess command call.</Description>
+    <Description>A library to fire subprocess command call.</Description>
     <Copyright>Copyright © Jerry Bian 2023</Copyright>
-    <Summary>A dotnet library to fire subprocess command call.</Summary>
+    <Summary>A library to fire subprocess command call.</Summary>
     <Title>Exec</Title>
   </PropertyGroup>
 

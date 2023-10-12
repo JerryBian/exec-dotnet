@@ -37,7 +37,6 @@ namespace ExecDotnet
                     Arguments = $"{option.ShellParameter} \"{tempScriptFile}\"",
                     CreateNoWindow = true,
                     RedirectStandardError = true,
-                    RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     UseShellExecute = false
                 };
@@ -55,7 +54,7 @@ namespace ExecDotnet
                     {
                         if (option.IsStreamed)
                         {
-                            await option.OutputDataReceived(e.Data);
+                            await option.OutputDataReceivedHandler(e.Data);
                         }
                         else
                         {
@@ -74,7 +73,7 @@ namespace ExecDotnet
                     {
                         if (option.IsStreamed)
                         {
-                            await option.ErrorDataReceived(e.Data);
+                            await option.ErrorDataReceivedHandler(e.Data);
                         }
                         else
                         {
@@ -85,15 +84,17 @@ namespace ExecDotnet
 
                 process.Exited += async (sender, e) =>
                 {
-                    await option.OnExited(process.ExitCode);
+                    await option.OnExitedHandler(process.ExitCode);
                 };
 
                 process.Start();
                 process.BeginErrorReadLine();
                 process.BeginOutputReadLine();
 
-                await Task.WhenAll(outputTcs.Task, errorTcs.Task, process.WaitForExitAsync(cts.Token));
+                await process.WaitForExitAsync(cts.Token);
+                await Task.WhenAll(outputTcs.Task, errorTcs.Task);
             }
+            catch (OperationCanceledException) { }
             finally
             {
                 try

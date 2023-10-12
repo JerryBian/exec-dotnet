@@ -16,11 +16,11 @@ namespace ExecDotnet
 
         public TimeSpan Timeout { get; set; }
 
-        public Func<string, Task> OutputDataReceived { get; set; }
+        public Func<string, Task> OutputDataReceivedHandler { get; set; }
 
-        public Func<string, Task> ErrorDataReceived { get; set; }
+        public Func<string, Task> ErrorDataReceivedHandler { get; set; }
 
-        public Func<int, Task> OnExited { get; set; }
+        public Func<int, Task> OnExitedHandler { get; set; }
 
         public bool IsStreamed { get; set; }
 
@@ -62,11 +62,11 @@ namespace ExecDotnet
 
             if (option.IsStreamed)
             {
-                option.OutputDataReceived ??= d => Task.CompletedTask;
-                option.ErrorDataReceived ??= d => Task.CompletedTask;
+                option.OutputDataReceivedHandler ??= d => Task.CompletedTask;
+                option.ErrorDataReceivedHandler ??= d => Task.CompletedTask;
             }
 
-            option.OnExited ??= c => Task.CompletedTask;
+            option.OnExitedHandler ??= c => Task.CompletedTask;
         }
 
         private static string GetDefaultShell()
