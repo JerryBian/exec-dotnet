@@ -22,6 +22,8 @@ namespace ExecDotnet
 
         public Func<int, Task> OnExitedHandler { get; set; }
 
+        public Func<Task> OnCancelledHandler { get; set; }
+
         public bool IsStreamed { get; set; }
 
         public static void Validate(ExecOption option)
@@ -67,6 +69,7 @@ namespace ExecDotnet
             }
 
             option.OnExitedHandler ??= c => Task.CompletedTask;
+            option.OnCancelledHandler ??= () => Task.CompletedTask;
         }
 
         private static string GetDefaultShell()

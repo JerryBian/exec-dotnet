@@ -94,7 +94,10 @@ namespace ExecDotnet
                 await process.WaitForExitAsync(cts.Token);
                 await Task.WhenAll(outputTcs.Task, errorTcs.Task);
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) 
+            {
+                await option.OnCancelledHandler();
+            }
             finally
             {
                 try

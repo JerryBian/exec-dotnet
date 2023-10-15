@@ -1,5 +1,7 @@
 A dotnet library to fire subprocess command call.
 
+[![master](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml/badge.svg)](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml)
+
 ## Usage
 
 Install from [NuGet](https://www.nuget.org/packages/exec)
@@ -38,11 +40,12 @@ The `ExecOption` can accept customized parameters in case of the default behavio
 | OutputDataReceivedHandler | Handler for new line of output data. Only works while `IsStreamed=true`. | Discard the output data. |
 | ErrorDataReceivedHandler | Handler for new line of error data. Only works while `IsStreamed=true`. | Discard the error data. |
 | OnExitedHandler | Handler for process exited. | Do nothing. |
+| OnCancelledHandler | Handler for process was cancelled. | Do nothing. |
 | IsStreamed | Switch for asynchronous output/error data handling. | false |
 
 ### Advanced usage
 
-#### Execute PowerShell command
+### Execute PowerShell command
 
 ```csharp
 var option = new ExecOption();
@@ -64,7 +67,7 @@ var output = await Exec.RunAsync(command, option);
 Assert.Contains("22", output);
 ```
 
-#### Execute command with timeout
+### Execute command with timeout
 
 ```csharp
 var option = new ExecOption();
@@ -75,7 +78,7 @@ sw.Stop();
 Assert.True(sw.Elapsed.TotalSeconds < 5);
 ```
 
-#### Handler stdout and stderr asynchronously
+### Handler stdout and stderr asynchronously
 
 ```csharp
 var sb = new StringBuilder();

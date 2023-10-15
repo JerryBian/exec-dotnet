@@ -14,17 +14,19 @@ namespace ExecDotnet.Test
         [Fact]
         public async Task HandleOutputAsync()
         {
+            var sb = new StringBuilder();
             var option = new ExecOption();
             option.IsStreamed = true;
-            var sb = new StringBuilder();
             option.OutputDataReceivedHandler = async (d) =>
             {
                 sb.AppendLine(d);
                 await Task.CompletedTask;
             };
+
             var output = await Exec.RunAsync(@"echo hello
 echo hello2
 echo hello3", option);
+
             Assert.True(output == "");
 
             var sbStr = sb.ToString();
