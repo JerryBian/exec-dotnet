@@ -45,7 +45,7 @@ The `ExecOption` can accept customized parameters in case of the default behavio
 
 ### Advanced usage
 
-### Execute PowerShell command
+#### Execute PowerShell command
 
 ```csharp
 var option = new ExecOption();
@@ -67,7 +67,7 @@ var output = await Exec.RunAsync(command, option);
 Assert.Contains("22", output);
 ```
 
-### Execute command with timeout
+#### Execute command with timeout
 
 ```csharp
 var option = new ExecOption();
@@ -78,7 +78,7 @@ sw.Stop();
 Assert.True(sw.Elapsed.TotalSeconds < 5);
 ```
 
-### Handler stdout and stderr asynchronously
+#### Handler stdout and stderr asynchronously
 
 ```csharp
 var sb = new StringBuilder();
