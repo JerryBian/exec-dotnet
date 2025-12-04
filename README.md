@@ -33,7 +33,7 @@ The `ExecOption` can accept customized parameters in case of the default behavio
 | Property | Comment | Default |
 | --- | --- | --- |
 | Shell | The shell application used to execute command passed in. | In windows default to `cmd.exe`, and `/bin/sh` for Linux and macOS. |
-| ShellParameter | Shell parameter for carrying out the script file. | In windows default to `/q/ c`, and empty string for Linxu and macOS. |
+| ShellParameter | Shell parameter for carrying out the script file. | In windows default to `/q /c`, and empty string for Linxu and macOS. |
 | ShellExtension | Script file extension. | In windows default to `.bat`, and `.sh` for Linxu and macOS. |
 | TempFileLocation | Directory for script file. | User temp file directory. |
 | Timeout | Command execution timeout. | Zero. Means no timeout applied. |

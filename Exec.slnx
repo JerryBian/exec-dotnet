@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="src/Exec.csproj" />
+  <Project Path="test/Exec.Test.csproj" />
+</Solution>
