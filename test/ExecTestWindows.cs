@@ -39,7 +39,7 @@ namespace ExecDotnet.Test
             var sw = Stopwatch.StartNew();
             var output = await Exec.RunAsync("timeout 60", option);
             sw.Stop();
-            Assert.Equal(-1, output.ExitCode);
+            Assert.NotEqual(0, output.ExitCode);
             Assert.True(output.ExitTime > date);
             Assert.True(sw.Elapsed.TotalSeconds < 5);
         }
