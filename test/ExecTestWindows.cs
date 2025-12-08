@@ -5,12 +5,27 @@ namespace ExecDotnet.Test
     public class ExecTestWindows
     {
         [SkippableFact]
+        public async Task InvlidCommand()
+        {
+            Skip.IfNot(OperatingSystem.IsWindows());
+
+            var date = DateTime.Now;
+            var output = await Exec.RunAsync("===?><::>>>>");
+            Assert.NotEqual(0, output.ExitCode);
+            Assert.True(output.ExitTime > date);
+            Assert.False(string.IsNullOrEmpty(output.Output));
+        }
+
+        [SkippableFact]
         public async Task ListRootDriver()
         {
             Skip.IfNot(OperatingSystem.IsWindows());
 
+            var date = DateTime.Now;
             var output = await Exec.RunAsync("dir C:\\");
-            Assert.False(string.IsNullOrEmpty(output));
+            Assert.Equal(0, output.ExitCode);
+            Assert.True(output.ExitTime > date);
+            Assert.False(string.IsNullOrEmpty(output.Output));
         }
 
         [SkippableFact]
@@ -18,11 +33,14 @@ namespace ExecDotnet.Test
         {
             Skip.IfNot(OperatingSystem.IsWindows());
 
+            var date = DateTime.Now;
             var option = new ExecOption();
             option.Timeout = TimeSpan.FromSeconds(3);
             var sw = Stopwatch.StartNew();
             var output = await Exec.RunAsync("timeout 60", option);
             sw.Stop();
+            Assert.Equal(-1, output.ExitCode);
+            Assert.True(output.ExitTime > date);
             Assert.True(sw.Elapsed.TotalSeconds < 5);
         }
 
@@ -31,6 +49,7 @@ namespace ExecDotnet.Test
         {
             Skip.IfNot(OperatingSystem.IsWindows());
 
+            var date = DateTime.Now;
             var option = new ExecOption();
             option.Shell = "pwsh";
             option.ShellParameter = "";
@@ -47,7 +66,9 @@ Write-Output $($Val1 + $Val2)
 
 Test-Add 10 12";
             var output = await Exec.RunAsync(command, option);
-            Assert.Contains("22", output);
+            Assert.Equal(0, output.ExitCode);
+            Assert.True(output.ExitTime > date);
+            Assert.Contains("22", output.Output);
         }
     }
 }

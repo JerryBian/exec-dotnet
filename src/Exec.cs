@@ -10,12 +10,12 @@ namespace ExecDotnet
 {
     public static class Exec
     {
-        public static async Task<string> RunAsync(string command, CancellationToken cancellationToken = default)
+        public static async Task<ExecResult> RunAsync(string command, CancellationToken cancellationToken = default)
         {
             return await RunAsync(command, new ExecOption(), cancellationToken);
         }
 
-        public static async Task<string> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
+        public static async Task<ExecResult> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
         {
             ExecOption.Validate(option);
             var linkedCancellationTokens = new List<CancellationToken> { cancellationToken };
@@ -25,6 +25,7 @@ namespace ExecDotnet
                 linkedCancellationTokens.Add(customCancellationTokenSource.Token);
             }
 
+            var result = new ExecResult();
             var sb = new StringBuilder();
             var tempScriptFile = await CreateScriptFileAsync(command, option, cancellationToken);
             var cts = CancellationTokenSource.CreateLinkedTokenSource(linkedCancellationTokens.ToArray());
@@ -40,17 +41,10 @@ namespace ExecDotnet
                     RedirectStandardOutput = true,
                     UseShellExecute = false
                 };
-                process.StartInfo = startInfo;
-                var outputTcs = new TaskCompletionSource<object>();
-                var errorTcs = new TaskCompletionSource<object>();
-
+                process.StartInfo = startInfo;      
                 process.OutputDataReceived += async (sender, e) =>
                 {
-                    if (e.Data == null)
-                    {
-                        outputTcs.SetResult(new object());
-                    }
-                    else
+                    if (e.Data != null)
                     {
                         if (option.IsStreamed)
                         {
@@ -65,11 +59,7 @@ namespace ExecDotnet
 
                 process.ErrorDataReceived += async (sender, e) =>
                 {
-                    if (e.Data == null)
-                    {
-                        errorTcs.SetResult(new object());
-                    }
-                    else
+                    if (e.Data != null)
                     {
                         if (option.IsStreamed)
                         {
@@ -92,7 +82,6 @@ namespace ExecDotnet
                 process.BeginOutputReadLine();
 
                 await process.WaitForExitAsync(cts.Token);
-                await Task.WhenAll(outputTcs.Task, errorTcs.Task);
             }
             catch (OperationCanceledException) 
             {
@@ -102,16 +91,26 @@ namespace ExecDotnet
             {
                 try
                 {
-                    process.Kill(true);
                     if (File.Exists(tempScriptFile))
                     {
                         File.Delete(tempScriptFile);
                     }
+
+                    process.Kill(true);
                 }
                 catch { }
+
+                if (!process.HasExited)
+                {
+                    process.WaitForExit();
+                }
+
+                result.ExitCode = process.ExitCode;
+                result.ExitTime = process.ExitTime;
             }
 
-            return sb.ToString();
+            result.Output = sb.ToString();
+            return result;
         }
 
         private static async Task<string> CreateScriptFileAsync(string command, ExecOption option, CancellationToken cancellationToken)

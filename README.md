@@ -24,9 +24,9 @@ That's all.
 Application just call the static methods of `Exec` class, along with below APIs.
 
 ```csharp
-Task<string> RunAsync(string command, CancellationToken cancellationToken = default)
+Task<ExecResult> RunAsync(string command, CancellationToken cancellationToken = default)
 
-Task<string> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
+Task<ExecResult> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
 ```
 The `ExecOption` can accept customized parameters in case of the default behavior not meet your requirements.
 
@@ -48,6 +48,7 @@ The `ExecOption` can accept customized parameters in case of the default behavio
 #### Execute PowerShell command
 
 ```csharp
+var date = DateTime.Now;
 var option = new ExecOption();
 option.Shell = "pwsh";
 option.ShellParameter = "";
@@ -63,24 +64,32 @@ Write-Output $($Val1 + $Val2)
 }
 
 Test-Add 10 12";
+
 var output = await Exec.RunAsync(command, option);
-Assert.Contains("22", output);
+Assert.Equal(0, output.ExitCode);
+Assert.True(output.ExitTime > date);
+Assert.Contains("22", output.Output);
 ```
 
 #### Execute command with timeout
 
 ```csharp
+var date = DateTime.Now;
 var option = new ExecOption();
 option.Timeout = TimeSpan.FromSeconds(3);
 var sw = Stopwatch.StartNew();
 var output = await Exec.RunAsync("timeout 60", option);
 sw.Stop();
+
+Assert.Equal(-1, output.ExitCode);
+Assert.True(output.ExitTime > date);
 Assert.True(sw.Elapsed.TotalSeconds < 5);
 ```
 
 #### Handler stdout and stderr asynchronously
 
 ```csharp
+var date = DateTime.Now;
 var sb = new StringBuilder();
 var option = new ExecOption();
 option.IsStreamed = true;
@@ -94,7 +103,9 @@ var output = await Exec.RunAsync(@"echo hello
 echo hello2
 echo hello3", option);
 
-Assert.True(output == "");
+Assert.Equal(0, output.ExitCode);
+Assert.True(output.ExitTime > date);
+Assert.True(output.Output == "");
 
 var sbStr = sb.ToString();
 Assert.Contains("hello", sbStr);

@@ -7,13 +7,17 @@ namespace ExecDotnet.Test
         [Fact]
         public async Task Echo()
         {
+            var date = DateTime.Now;
             var output = await Exec.RunAsync("echo hello");
-            Assert.Contains("hello", output);
+            Assert.Equal(0, output.ExitCode);
+            Assert.True(output.ExitTime > date);
+            Assert.Contains("hello", output.Output);
         }
 
         [Fact]
         public async Task HandleOutputAsync()
         {
+            var date = DateTime.Now;
             var sb = new StringBuilder();
             var option = new ExecOption();
             option.IsStreamed = true;
@@ -27,7 +31,9 @@ namespace ExecDotnet.Test
 echo hello2
 echo hello3", option);
 
-            Assert.True(output == "");
+            Assert.Equal(0, output.ExitCode);
+            Assert.True(output.ExitTime > date);
+            Assert.True(output.Output == "");
 
             var sbStr = sb.ToString();
             Assert.Contains("hello", sbStr);
