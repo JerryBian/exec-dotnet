@@ -53,13 +53,16 @@ namespace ExecDotnet
                 option.TempFileLocation = Path.GetTempPath();
             }
 
-            try
+            if (!Directory.Exists(option.TempFileLocation))
             {
-                Directory.CreateDirectory(option.TempFileLocation);
-            }
-            catch (Exception ex)
-            {
-                throw new ExecException($"TempFileLocation {option.TempFileLocation} is invalid: {ex.Message}");
+                try
+                {
+                    Directory.CreateDirectory(option.TempFileLocation);
+                }
+                catch (Exception ex)
+                {
+                    throw new ExecException($"TempFileLocation {option.TempFileLocation} is invalid: {ex.Message}");
+                }
             }
 
             if (option.IsStreamed)

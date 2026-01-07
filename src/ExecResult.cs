@@ -9,5 +9,7 @@ namespace ExecDotnet
         public DateTime ExitTime { get; set; }
 
         public int ExitCode { get; set; }
+
+        public bool WasCancelled { get; set; }
     }
 }

@@ -17,19 +17,41 @@ namespace ExecDotnet
 
         public static async Task<ExecResult> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
         {
-            ExecOption.Validate(option);
-            var linkedCancellationTokens = new List<CancellationToken> { cancellationToken };
-            if (option.Timeout > TimeSpan.Zero)
+            if (string.IsNullOrWhiteSpace(command))
             {
-                var customCancellationTokenSource = new CancellationTokenSource(option.Timeout);
-                linkedCancellationTokens.Add(customCancellationTokenSource.Token);
+                throw new ArgumentException("Command cannot be null or empty.", nameof(command));
+            }
+
+            ExecOption.Validate(option);
+            CancellationTokenSource customCancellationTokenSource = null;
+            CancellationTokenSource cts = null;
+            
+            // Create linked cancellation token source
+            if (option.Timeout > TimeSpan.Zero && cancellationToken != default)
+            {
+                customCancellationTokenSource = new CancellationTokenSource(option.Timeout);
+                cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, customCancellationTokenSource.Token);
+            }
+            else if (option.Timeout > TimeSpan.Zero)
+            {
+                customCancellationTokenSource = new CancellationTokenSource(option.Timeout);
+                cts = CancellationTokenSource.CreateLinkedTokenSource(customCancellationTokenSource.Token);
+            }
+            else if (cancellationToken != default)
+            {
+                cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            }
+            else
+            {
+                cts = new CancellationTokenSource();
             }
 
             var result = new ExecResult();
             var sb = new StringBuilder();
             var tempScriptFile = await CreateScriptFileAsync(command, option, cancellationToken);
-            var cts = CancellationTokenSource.CreateLinkedTokenSource(linkedCancellationTokens.ToArray());
             using var process = new Process();
+            bool wasCancelled = false;
+            bool wasExternalCancellation = false;
             try
             {
                 var startInfo = new ProcessStartInfo
@@ -41,14 +63,16 @@ namespace ExecDotnet
                     RedirectStandardOutput = true,
                     UseShellExecute = false
                 };
-                process.StartInfo = startInfo;      
-                process.OutputDataReceived += async (sender, e) =>
+                process.StartInfo = startInfo;
+                process.EnableRaisingEvents = true;
+                
+                process.OutputDataReceived += (sender, e) =>
                 {
                     if (e.Data != null)
                     {
                         if (option.IsStreamed)
                         {
-                            await option.OutputDataReceivedHandler(e.Data);
+                            _ = option.OutputDataReceivedHandler(e.Data);
                         }
                         else
                         {
@@ -57,13 +81,13 @@ namespace ExecDotnet
                     }
                 };
 
-                process.ErrorDataReceived += async (sender, e) =>
+                process.ErrorDataReceived += (sender, e) =>
                 {
                     if (e.Data != null)
                     {
                         if (option.IsStreamed)
                         {
-                            await option.ErrorDataReceivedHandler(e.Data);
+                            _ = option.ErrorDataReceivedHandler(e.Data);
                         }
                         else
                         {
@@ -72,9 +96,9 @@ namespace ExecDotnet
                     }
                 };
 
-                process.Exited += async (sender, e) =>
+                process.Exited += (sender, e) =>
                 {
-                    await option.OnExitedHandler(process.ExitCode);
+                    _ = option.OnExitedHandler(process.ExitCode);
                 };
 
                 process.Start();
@@ -82,31 +106,66 @@ namespace ExecDotnet
                 process.BeginOutputReadLine();
 
                 await process.WaitForExitAsync(cts.Token);
+                result.WasCancelled = false;
             }
             catch (OperationCanceledException) 
             {
+                wasCancelled = true;
+                result.WasCancelled = true;
+                
+                // Check if external cancellation token was the cause (not timeout)
+                if (cancellationToken != default && cancellationToken.IsCancellationRequested)
+                {
+                    wasExternalCancellation = true;
+                }
+                
                 await option.OnCancelledHandler();
+                
+                // Only throw if it was external cancellation
+                if (wasExternalCancellation)
+                {
+                    throw;
+                }
             }
             finally
             {
+                customCancellationTokenSource?.Dispose();
+                cts?.Dispose();
+                
                 try
                 {
                     if (File.Exists(tempScriptFile))
                     {
                         File.Delete(tempScriptFile);
                     }
-
-                    process.Kill(true);
                 }
-                catch { }
-
-                if (!process.HasExited)
+                catch
                 {
-                    process.WaitForExit();
                 }
 
-                result.ExitCode = process.ExitCode;
-                result.ExitTime = process.ExitTime;
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(true);
+                        process.WaitForExit();
+                    }
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    result.ExitCode = process.ExitCode;
+                    result.ExitTime = process.ExitTime;
+                }
+                catch
+                {
+                    // Process may not have valid exit code/time if killed
+                    result.ExitCode = -1;
+                    result.ExitTime = DateTime.MinValue;
+                }
             }
 
             result.Output = sb.ToString();

@@ -1,117 +1,167 @@
-A dotnet library to fire subprocess command call.
+# A .NET library for executing subprocess commands
 
 [![master](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml/badge.svg)](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml)
 
-## Usage
+## Installation
 
-Install from [NuGet](https://www.nuget.org/packages/exec)
+Install from [NuGet](https://www.nuget.org/packages/exec):
 
-```
+```bash
 dotnet add package Exec
 ```
 
-This library supports .NET 5 and version onwards.
+This library supports .NET 5 and later versions.
+
+## Usage
 
 ### Basic usage
 
+The simplest way to execute a command:
+
 ```csharp
-var output = await Exec.RunAsync("echo hello");
-Assert.Contains("hello", output);
+var result = await Exec.RunAsync("echo hello");
+Assert.Contains("hello", result.Output);
 ```
 
-That's all. 
-
-Application just call the static methods of `Exec` class, along with below APIs.
+That's it! The library provides static methods on the `Exec` class with the following APIs:
 
 ```csharp
 Task<ExecResult> RunAsync(string command, CancellationToken cancellationToken = default)
 
 Task<ExecResult> RunAsync(string command, ExecOption option, CancellationToken cancellationToken = default)
 ```
-The `ExecOption` can accept customized parameters in case of the default behavior not meet your requirements.
 
-| Property | Comment | Default |
+### Configuration
+
+Use `ExecOption` to customize behavior beyond the defaults:
+
+| Property | Description | Default |
 | --- | --- | --- |
-| Shell | The shell application used to execute command passed in. | In windows default to `cmd.exe`, and `/bin/sh` for Linux and macOS. |
-| ShellParameter | Shell parameter for carrying out the script file. | In windows default to `/q /c`, and empty string for Linxu and macOS. |
-| ShellExtension | Script file extension. | In windows default to `.bat`, and `.sh` for Linxu and macOS. |
-| TempFileLocation | Directory for script file. | User temp file directory. |
-| Timeout | Command execution timeout. | Zero. Means no timeout applied. |
-| OutputDataReceivedHandler | Handler for new line of output data. Only works while `IsStreamed=true`. | Discard the output data. |
-| ErrorDataReceivedHandler | Handler for new line of error data. Only works while `IsStreamed=true`. | Discard the error data. |
-| OnExitedHandler | Handler for process exited. | Do nothing. |
-| OnCancelledHandler | Handler for process was cancelled. | Do nothing. |
-| IsStreamed | Switch for asynchronous output/error data handling. | false |
+| Shell | The shell application used to execute the command. | `cmd.exe` on Windows, `/bin/bash` on Linux and macOS. |
+| ShellParameter | Shell parameters for executing the script file. | `/q /c` on Windows, empty string on Linux and macOS. |
+| ShellExtension | Script file extension. | `.bat` on Windows, `.sh` on Linux and macOS. |
+| TempFileLocation | Directory where temporary script files are created. | System temp directory. |
+| Timeout | Maximum execution time for the command. | Zero (no timeout). |
+| OutputDataReceivedHandler | Handler for each line of standard output. Only called when `IsStreamed=true`. | Output is discarded. |
+| ErrorDataReceivedHandler | Handler for each line of standard error. Only called when `IsStreamed=true`. | Errors are discarded. |
+| OnExitedHandler | Handler called when the process exits. | No action. |
+| OnCancelledHandler | Handler called when the process is cancelled. | No action. |
+| IsStreamed | Enable asynchronous streaming of output/error data. | `false` |
 
-### Advanced usage
+### Result
 
-#### Execute PowerShell command
+`ExecResult` provides the following information:
+
+| Property | Description |
+| --- | --- |
+| Output | Combined standard output and standard error when `IsStreamed=false`. Empty when `IsStreamed=true`. |
+| ExitCode | The process exit code. |
+| ExitTime | The time when the process exited. |
+| WasCancelled | `true` if the process was cancelled due to timeout or cancellation token; otherwise `false`. |
+
+### Cancellation behavior
+
+The library handles cancellation differently based on the source:
+
+- **Timeout** (via `ExecOption.Timeout`): Returns `ExecResult` with `WasCancelled = true`
+- **CancellationToken**: Throws `OperationCanceledException` (or `TaskCanceledException`)
+
+This allows timeout scenarios to be handled gracefully while external cancellations propagate as exceptions.
+
+## Advanced usage
+
+### Execute PowerShell commands
 
 ```csharp
-var date = DateTime.Now;
-var option = new ExecOption();
-option.Shell = "pwsh";
-option.ShellParameter = "";
-option.ShellExtension = ".ps1";
-var command = @"function Test-Add {
-[CmdletBinding()]
-param (
-[int]$Val1,
-[int]$Val2
-)
+var option = new ExecOption
+{
+    Shell = "pwsh",
+    ShellParameter = "",
+    ShellExtension = ".ps1"
+};
 
-Write-Output $($Val1 + $Val2)
+var command = @"function Test-Add {
+    [CmdletBinding()]
+    param (
+        [int]$Val1,
+        [int]$Val2
+    )
+
+    Write-Output $($Val1 + $Val2)
 }
 
 Test-Add 10 12";
 
-var output = await Exec.RunAsync(command, option);
-Assert.Equal(0, output.ExitCode);
-Assert.True(output.ExitTime > date);
-Assert.Contains("22", output.Output);
+var result = await Exec.RunAsync(command, option);
+Assert.Equal(0, result.ExitCode);
+Assert.Contains("22", result.Output);
 ```
 
-#### Execute command with timeout
+### Execute commands with timeout
+
+When using a timeout, the command returns a result with `WasCancelled = true`:
 
 ```csharp
-var date = DateTime.Now;
-var option = new ExecOption();
-option.Timeout = TimeSpan.FromSeconds(3);
-var sw = Stopwatch.StartNew();
-var output = await Exec.RunAsync("timeout 60", option);
-sw.Stop();
-
-Assert.NotEqual(0, output.ExitCode);
-Assert.True(output.ExitTime > date);
-Assert.True(sw.Elapsed.TotalSeconds < 5);
-```
-
-#### Handler stdout and stderr asynchronously
-
-```csharp
-var date = DateTime.Now;
-var sb = new StringBuilder();
-var option = new ExecOption();
-option.IsStreamed = true;
-option.OutputDataReceivedHandler = async (d) =>
+var option = new ExecOption
 {
-    sb.AppendLine(d);
-    await Task.CompletedTask;
+    Timeout = TimeSpan.FromSeconds(3)
 };
 
-var output = await Exec.RunAsync(@"echo hello
+// Note: On Windows, use 'ping' instead of 'timeout' because timeout.exe doesn't work with redirected stdin
+var result = await Exec.RunAsync("ping 127.0.0.1 -n 60", option);
+
+// Process was terminated due to timeout
+Assert.True(result.WasCancelled);
+Assert.NotEqual(0, result.ExitCode);
+```
+
+### Stream stdout and stderr asynchronously
+
+```csharp
+var output = new StringBuilder();
+var option = new ExecOption
+{
+    IsStreamed = true,
+    OutputDataReceivedHandler = async (line) =>
+    {
+        output.AppendLine(line);
+        await Task.CompletedTask;
+    }
+};
+
+var result = await Exec.RunAsync(@"echo hello
 echo hello2
 echo hello3", option);
 
-Assert.Equal(0, output.ExitCode);
-Assert.True(output.ExitTime > date);
-Assert.True(output.Output == "");
+Assert.Equal(0, result.ExitCode);
+Assert.Empty(result.Output); // Output is empty in streaming mode
 
-var sbStr = sb.ToString();
-Assert.Contains("hello", sbStr);
-Assert.Contains("hello2", sbStr);
-Assert.Contains("hello3", sbStr);
+var capturedOutput = output.ToString();
+Assert.Contains("hello", capturedOutput);
+Assert.Contains("hello2", capturedOutput);
+Assert.Contains("hello3", capturedOutput);
 ```
+
+### Use cancellation tokens
+
+When using a cancellation token, the operation throws `OperationCanceledException`:
+
+```csharp
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+try
+{
+    var result = await Exec.RunAsync("long-running-command", cts.Token);
+}
+catch (OperationCanceledException)
+{
+    // Command was cancelled via the cancellation token
+}
+```
+
+## Known limitations
+
+- **Windows `timeout` command**: The Windows `timeout.exe` command doesn't work because it requires interactive input and fails with redirected stdin. Use `ping 127.0.0.1 -n <seconds>` as an alternative for delays.
 
 ## License
 
