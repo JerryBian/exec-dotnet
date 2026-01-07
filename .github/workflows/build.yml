@@ -18,11 +18,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10'
+          dotnet-version: 10
 
       - name: Restore dependencies
         run: dotnet restore
@@ -42,48 +44,88 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10'
+          dotnet-version: 10
 
       - name: Calculate version
         id: version
         run: |
-          # Read major version from VERSION file
           MAJOR_VERSION=$(cat VERSION)
-          
-          # Use GitHub run number as the minor version
           MINOR_VERSION=${{ github.run_number }}
-          
-          # Build full version string
           APP_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "version=$APP_VERSION" >> $GITHUB_OUTPUT
-          echo "?? Calculated version: $APP_VERSION (run number: ${{ github.run_number }})"
+          echo "Calculated version: $APP_VERSION (run number: ${{ github.run_number }})"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          git fetch --tags --force
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="$LAST_TAG..HEAD"
+          fi
+
+          echo "Using range: $RANGE"
+          git log $RANGE --pretty=format:'- %h %s (%an) [%ad]' --date=iso > /tmp/changelog.md
+
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+          {
+            echo "changelog<<EOF"
+            cat /tmp/changelog.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Build package
-        run: dotnet pack src/Exec.csproj -c Release --include-source --include-symbols -p:Version=${{ env.APP_VERSION }} -p:PackageVersion=${{ env.APP_VERSION }}
+        run: |
+          mkdir -p ./nupkg
+          dotnet pack src/Exec.csproj \
+            -c Release \
+            --include-source \
+            --include-symbols \
+            --output ./nupkg \
+            -p:Version=${{ env.APP_VERSION }} \
+            -p:PackageVersion=${{ env.APP_VERSION }}
+          ls -la ./nupkg
 
       - name: Publish to NuGet
         if: env.APP_VERSION != ''
         shell: pwsh
         run: |
-          $OutputPath = "./nupkg/${{ env.APP_VERSION }}"
-          $PkgPath = "$OutputPath/Exec.${{ env.APP_VERSION }}.nupkg"
-          
+          $PkgPath = "./nupkg/Exec.${{ env.APP_VERSION }}.nupkg"
           if (!(Test-Path $PkgPath)) {
-            Write-Error "? No package found at $PkgPath"
+            Write-Error "No package found at $PkgPath"
+            Write-Host "Contents of ./nupkg:"
+            Get-ChildItem ./nupkg
             exit 1
           }
-          
+
           $ApiKey = "${{ secrets.NUGET_API_KEY }}"
           if (!$ApiKey) {
-            Write-Error "? NuGet API Key not found in secrets"
+            Write-Error "NuGet API Key not found in secrets"
             exit 1
           }
-          
-          Write-Host "?? Publishing package: $PkgPath"
+
+          Write-Host "Publishing package: $PkgPath"
           dotnet nuget push $PkgPath -k $ApiKey -s https://api.nuget.org/v3/index.json --skip-duplicate
-          Write-Host "? Package published successfully!"
+          Write-Host "Package published successfully!"
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          release_name: v${{ env.APP_VERSION }}
+          body: |
+            Release v${{ env.APP_VERSION }} for Exec.
+
+            Changes since ${{ steps.changelog.outputs.last_tag || 'start' }}:
+            ${{ steps.changelog.outputs.changelog }}
