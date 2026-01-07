@@ -107,6 +107,8 @@ jobs:
             echo "Package size: $(du -h "$PKG_PATH" | cut -f1)"
           else
             echo "Package not found: $PKG_PATH"
+            echo "Contents of ./nupkg:"
+            ls -lah ./nupkg
             exit 1
           fi
 
