@@ -1,6 +1,7 @@
 # A .NET library for executing subprocess commands
 
 [![master](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml/badge.svg)](https://github.com/JerryBian/exec-dotnet/actions/workflows/build.yml)
+[![NuGet](https://img.shields.io/nuget/v/Exec.svg)](https://www.nuget.org/packages/Exec)
 
 ## Installation
 
@@ -162,6 +163,14 @@ catch (OperationCanceledException)
 ## Known limitations
 
 - **Windows `timeout` command**: The Windows `timeout.exe` command doesn't work because it requires interactive input and fails with redirected stdin. Use `ping 127.0.0.1 -n <seconds>` as an alternative for delays.
+
+## Versioning
+
+This project uses automated semantic versioning. The major version is defined in the `VERSION` file, and the minor version is automatically incremented on each release. See [VERSIONING.md](./VERSIONING.md) for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 

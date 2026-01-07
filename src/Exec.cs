@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -50,7 +49,6 @@ namespace ExecDotnet
             var sb = new StringBuilder();
             var tempScriptFile = await CreateScriptFileAsync(command, option, cancellationToken);
             using var process = new Process();
-            bool wasCancelled = false;
             bool wasExternalCancellation = false;
             try
             {
@@ -110,7 +108,6 @@ namespace ExecDotnet
             }
             catch (OperationCanceledException) 
             {
-                wasCancelled = true;
                 result.WasCancelled = true;
                 
                 // Check if external cancellation token was the cause (not timeout)
