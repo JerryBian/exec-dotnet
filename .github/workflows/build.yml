@@ -11,8 +11,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8'
@@ -26,8 +24,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8'
@@ -41,8 +37,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8'
@@ -58,8 +52,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Calculate version
         id: version
@@ -67,30 +59,14 @@ jobs:
           # Read major version from VERSION file
           MAJOR_VERSION=$(cat VERSION)
           
-          # Get the latest tag matching the major version pattern
-          LATEST_TAG=$(git tag -l "${MAJOR_VERSION}.*.*" --sort=-v:refname | head -n 1)
-          
-          if [ -z "$LATEST_TAG" ]; then
-            # No existing tags for this major version, start with MAJOR.0.0
-            MINOR_VERSION=0
-          else
-            # Extract minor version from latest tag and increment
-            MINOR_VERSION=$(echo $LATEST_TAG | cut -d. -f2)
-            MINOR_VERSION=$((MINOR_VERSION + 1))
-          fi
+          # Use GitHub run ID as the minor version
+          MINOR_VERSION=${{ github.run_id }}
           
           # Build full version string
           APP_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "version=$APP_VERSION" >> $GITHUB_OUTPUT
-          echo "Calculated version: $APP_VERSION"
-
-      - name: Create and push tag
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "${{ env.APP_VERSION }}" -m "Release ${{ env.APP_VERSION }}"
-          git push origin "${{ env.APP_VERSION }}"
+          echo "Calculated version: $APP_VERSION (run ID: ${{ github.run_id }})"
 
       - uses: actions/setup-dotnet@v3
         with:
