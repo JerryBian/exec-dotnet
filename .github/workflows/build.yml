@@ -67,7 +67,7 @@ jobs:
         id: read_version
         run: |
           MAJOR_VERSION=$(cat VERSION | tr -d '[:space:]')
-          FULL_VERSION="${MAJOR_VERSION}.${{ github.run_number }}"
+          FULL_VERSION="${MAJOR_VERSION}.${{ github.run_number }}.0"
           echo "MAJOR_VERSION=$MAJOR_VERSION" >> $GITHUB_ENV
           echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
           echo "Major version: $MAJOR_VERSION"
@@ -155,7 +155,7 @@ jobs:
         id: read_version
         run: |
           MAJOR_VERSION=$(cat VERSION | tr -d '[:space:]')
-          FULL_VERSION="${MAJOR_VERSION}.${{ github.run_number }}"
+          FULL_VERSION="${MAJOR_VERSION}.${{ github.run_number }}.0"
           echo "MAJOR_VERSION=$MAJOR_VERSION" >> $GITHUB_ENV
           echo "FULL_VERSION=$FULL_VERSION" >> $GITHUB_ENV
           echo "Major version: $MAJOR_VERSION"
