@@ -59,14 +59,14 @@ jobs:
           # Read major version from VERSION file
           MAJOR_VERSION=$(cat VERSION)
           
-          # Use GitHub run ID as the minor version
-          MINOR_VERSION=${{ github.run_id }}
+          # Use GitHub run number as the minor version
+          MINOR_VERSION=${{ github.run_number }}
           
           # Build full version string
           APP_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "version=$APP_VERSION" >> $GITHUB_OUTPUT
-          echo "Calculated version: $APP_VERSION (run ID: ${{ github.run_id }})"
+          echo "Calculated version: $APP_VERSION (run number: ${{ github.run_number }})"
 
       - uses: actions/setup-dotnet@v3
         with:
