@@ -24,7 +24,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10
+          dotnet-version: 8.0.x
 
       - name: Restore dependencies
         run: dotnet restore
@@ -50,7 +50,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10
+          dotnet-version: 8.0.x
 
       - name: Calculate version
         id: version
@@ -67,21 +67,21 @@ jobs:
         run: |
           git fetch --tags --force
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
           if [ -z "$LAST_TAG" ]; then
-            RANGE="HEAD"
+            echo "No previous tag found, using all commits"
+            CHANGELOG=$(git log --pretty=format:'- %h %s (%an) [%ad]' --date=iso | head -20)
           else
-            RANGE="$LAST_TAG..HEAD"
+            echo "Previous tag: $LAST_TAG"
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:'- %h %s (%an) [%ad]' --date=iso)
           fi
-
-          echo "Using range: $RANGE"
-          git log $RANGE --pretty=format:'- %h %s (%an) [%ad]' --date=iso > /tmp/changelog.md
-
-          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
-          {
-            echo "changelog<<EOF"
-            cat /tmp/changelog.md
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          
+          echo "last_tag=${LAST_TAG:-initial}" >> $GITHUB_OUTPUT
+          
+          # Save changelog to environment file properly
+          echo "changelog<<CHANGELOG_EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "CHANGELOG_EOF" >> $GITHUB_OUTPUT
 
       - name: Build package
         run: |
@@ -118,14 +118,14 @@ jobs:
           Write-Host "Package published successfully!"
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APP_VERSION }}
-          release_name: v${{ env.APP_VERSION }}
+          name: v${{ env.APP_VERSION }}
           body: |
             Release v${{ env.APP_VERSION }} for Exec.
 
-            Changes since ${{ steps.changelog.outputs.last_tag || 'start' }}:
+            ## Changes
+            
             ${{ steps.changelog.outputs.changelog }}
+          token: ${{ secrets.GITHUB_TOKEN }}
