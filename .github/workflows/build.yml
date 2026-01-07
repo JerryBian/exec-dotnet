@@ -1,57 +1,52 @@
-name: master
+name: Build and Publish
 
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 jobs:
-  build_test_windows:
-    name: Run build and test [Windows]
-    runs-on: windows-latest
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8'
-      - name: Run test
-        run: |
-          dotnet test test/
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  build_test_mac:
-    name: Run build and test [macOS]
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8'
-      - name: Run test
-        run: |
-          dotnet test test/
+          dotnet-version: '10'
 
-  build_test_linux:
-    name: Run build and test [Linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8'
-      - name: Run test
-        run: |
-          dotnet test test/
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run tests
+        run: dotnet test test/ --no-build --configuration Release --verbosity normal
 
   publish_nuget:
-    name: Publish NuGet package
+    name: Publish NuGet Package
     runs-on: ubuntu-latest
-    needs: [build_test_mac, build_test_linux, build_test_windows]
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10'
 
       - name: Calculate version
         id: version
@@ -66,15 +61,29 @@ jobs:
           APP_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.0"
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "version=$APP_VERSION" >> $GITHUB_OUTPUT
-          echo "Calculated version: $APP_VERSION (run number: ${{ github.run_number }})"
+          echo "?? Calculated version: $APP_VERSION (run number: ${{ github.run_number }})"
 
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8'
+      - name: Build package
+        run: dotnet pack src/Exec.csproj -c Release --include-source --include-symbols -p:Version=${{ env.APP_VERSION }} -p:PackageVersion=${{ env.APP_VERSION }}
 
-      - name: Publish NuGet package
+      - name: Publish to NuGet
+        if: env.APP_VERSION != ''
         shell: pwsh
         run: |
-          $env:NugetApiKey = "${{ secrets.NUGET_API_KEY }}"
-          ls
-          ./pack.ps1 ${{ env.APP_VERSION }}
+          $OutputPath = "./nupkg/${{ env.APP_VERSION }}"
+          $PkgPath = "$OutputPath/Exec.${{ env.APP_VERSION }}.nupkg"
+          
+          if (!(Test-Path $PkgPath)) {
+            Write-Error "? No package found at $PkgPath"
+            exit 1
+          }
+          
+          $ApiKey = "${{ secrets.NUGET_API_KEY }}"
+          if (!$ApiKey) {
+            Write-Error "? NuGet API Key not found in secrets"
+            exit 1
+          }
+          
+          Write-Host "?? Publishing package: $PkgPath"
+          dotnet nuget push $PkgPath -k $ApiKey -s https://api.nuget.org/v3/index.json --skip-duplicate
+          Write-Host "? Package published successfully!"
